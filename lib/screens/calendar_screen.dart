@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../models/cycle_models.dart';
+import '../widgets/daily_log_editor.dart';
 
 class CalendarScreen extends StatefulWidget {
   final List<DateTime> periodStartDates;
-  final Map<String, Set<String>> dailySymptoms;
-  final int averageCycleLength;
-  final int averagePeriodDuration;
-  final List<String> availableSymptoms;
-  final void Function(DateTime date, String symptom) onToggleSymptom;
+  final Map<String, DailyLog> dailyLogs;
+  final int effectiveCycleLength;
+  final int effectivePeriodDuration;
+  final void Function(DateTime date, DailyLog updatedLog) onUpdateLog;
 
   const CalendarScreen({
     super.key,
     required this.periodStartDates,
-    required this.dailySymptoms,
-    required this.averageCycleLength,
-    required this.averagePeriodDuration,
-    required this.availableSymptoms,
-    required this.onToggleSymptom,
+    required this.dailyLogs,
+    required this.effectiveCycleLength,
+    required this.effectivePeriodDuration,
+    required this.onUpdateLog,
   });
 
   @override
@@ -39,7 +38,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Widget build(BuildContext context) {
     final lastStart = widget.periodStartDates.first;
     final selectedKey = CycleCalculator.dateKey(_selectedDay);
-    final selectedSymptoms = widget.dailySymptoms[selectedKey] ?? {};
+    final selectedLog = widget.dailyLogs[selectedKey] ?? const DailyLog();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -67,7 +66,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
               },
               eventLoader: (day) {
                 final key = CycleCalculator.dateKey(day);
-                return widget.dailySymptoms[key]?.toList() ?? [];
+                final log = widget.dailyLogs[key];
+                return (log != null && !log.isEmpty) ? ['log'] : [];
               },
               headerStyle: const HeaderStyle(
                 formatButtonVisible: false,
@@ -96,7 +96,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ),
           ),
+
           const SizedBox(height: 16),
+
+          // Legenda
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -111,38 +114,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
               ),
             ],
           ),
+
           const SizedBox(height: 24),
+
           Text(
-            'Sintomi del ${CycleCalculator.formatDateIt(_selectedDay)}',
+            'Diario del ${CycleCalculator.formatDateIt(_selectedDay)}',
             style: const TextStyle(
-              fontSize: 17,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Color(0xFF2C2520),
             ),
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: widget.availableSymptoms.map((symptom) {
-              final isSelected = selectedSymptoms.contains(symptom);
-              return FilterChip(
-                label: Text(symptom),
-                selected: isSelected,
-                onSelected: (_) => widget.onToggleSymptom(_selectedDay, symptom),
-                backgroundColor: const Color(0xFFFFFDF9),
-                selectedColor: const Color(0xFFD97757).withValues(alpha: 0.2),
-                checkmarkColor: const Color(0xFFD97757),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: isSelected
-                        ? const Color(0xFFD97757)
-                        : const Color(0xFFE6DDD3),
-                  ),
-                ),
-              );
-            }).toList(),
+
+          DailyLogEditor(
+            date: _selectedDay,
+            log: selectedLog,
+            onChanged: (updated) => widget.onUpdateLog(_selectedDay, updated),
           ),
         ],
       ),
@@ -158,21 +146,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final isPeriod = CycleCalculator.isPeriodDay(
       day,
       widget.periodStartDates,
-      widget.averagePeriodDuration,
+      widget.effectivePeriodDuration,
+      widget.dailyLogs,
     );
     final isPredicted = !isPeriod &&
         CycleCalculator.isPredictedPeriodDay(
           day,
           lastStart,
-          widget.averageCycleLength,
-          widget.averagePeriodDuration,
+          widget.effectiveCycleLength,
+          widget.effectivePeriodDuration,
         );
     final isFertile = !isPeriod &&
         !isPredicted &&
         CycleCalculator.isFertileDay(
           day,
           lastStart,
-          widget.averageCycleLength,
+          widget.effectiveCycleLength,
         );
 
     Color bgColor = Colors.transparent;
