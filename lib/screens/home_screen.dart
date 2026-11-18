@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/cycle_models.dart';
 import '../services/storage_service.dart';
+import '../services/push_service.dart';
 import '../widgets/daily_log_editor.dart';
+import '../widgets/notification_settings_sheet.dart';
 import 'calendar_screen.dart';
 import 'analytics_screen.dart';
 
@@ -24,6 +26,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   bool _autoCalculate = true;
   List<DateTime> _periodStartDates = [];
   Map<String, DailyLog> _dailyLogs = {};
+  NotificationSettings _notificationSettings = const NotificationSettings();
 
   @override
   void initState() {
@@ -33,12 +36,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   Future<void> _initData() async {
     final data = await _storage.loadData();
+    final notifSettings = await _storage.loadNotificationSettings();
     setState(() {
       _periodStartDates = data.periodStartDates;
       _dailyLogs = data.dailyLogs;
       _manualCycleLength = data.manualCycleLength;
       _manualPeriodDuration = data.manualPeriodDuration;
       _autoCalculate = data.autoCalculate;
+      _notificationSettings = notifSettings;
       _isLoading = false;
     });
   }
@@ -65,6 +70,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int get _daysUntilNextPeriod {
     final today = CycleCalculator.normalizeDate(DateTime.now());
     return _nextPredictedPeriod.difference(today).inDays;
+  }
+
+  Future<void> _syncPushInBackground() async {
+    if (!_notificationSettings.enabled) return;
+    final todayKey = CycleCalculator.dateKey(DateTime.now());
+    final hasLoggedToday =
+        _dailyLogs[todayKey] != null && !_dailyLogs[todayKey]!.isEmpty;
+    try {
+      await PushService.syncWithServer(
+        settings: _notificationSettings,
+        lastPeriodStart: _lastPeriodStart,
+        effectiveCycleLength: _analytics.effectiveCycleLength,
+        hasLoggedToday: hasLoggedToday,
+      );
+    } catch (_) {}
   }
 
   Future<void> _logNewPeriodStart() async {
@@ -95,6 +115,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
       await _storage.savePeriodStarts(_periodStartDates);
       await _storage.saveDailyLogs(_dailyLogs);
+      await _syncPushInBackground();
     }
   }
 
@@ -108,6 +129,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       }
     });
     await _storage.saveDailyLogs(_dailyLogs);
+    await _syncPushInBackground();
   }
 
   Future<void> _copyBackupToClipboard() async {
@@ -380,6 +402,38 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       appBar: AppBar(
         title: const Text('AUREA'),
         actions: [
+          IconButton(
+            icon: Icon(
+              _notificationSettings.enabled
+                  ? Icons.notifications_active_rounded
+                  : Icons.notifications_none_rounded,
+              color: const Color(0xFF2C2520),
+            ),
+            tooltip: 'Promemoria',
+            onPressed: () {
+              final todayKey = CycleCalculator.dateKey(DateTime.now());
+              final hasLoggedToday =
+                  _dailyLogs[todayKey] != null && !_dailyLogs[todayKey]!.isEmpty;
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: const Color(0xFFFFFDF9),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                builder: (_) => NotificationSettingsSheet(
+                  initialSettings: _notificationSettings,
+                  lastPeriodStart: _lastPeriodStart,
+                  effectiveCycleLength: _analytics.effectiveCycleLength,
+                  hasLoggedToday: hasLoggedToday,
+                  onSaveSettings: (updated) async {
+                    setState(() => _notificationSettings = updated);
+                    await _storage.saveNotificationSettings(updated);
+                  },
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.tune_rounded, color: Color(0xFF2C2520)),
             onPressed: _openSettingsModal,
@@ -684,7 +738,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             itemCount: _periodStartDates.length,
             itemBuilder: (context, index) {
               final startDate = _periodStartDates[index];
-              String cycleDurationLabel = 'Ciclo attuale (Giorno $_currentCycleDay)';
+              String cycleDurationLabel =
+                  'Ciclo attuale (Giorno $_currentCycleDay)';
 
               if (index > 0) {
                 final previousStart = _periodStartDates[index - 1];
@@ -729,6 +784,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         _periodStartDates.removeAt(index);
                       });
                       await _storage.savePeriodStarts(_periodStartDates);
+                      await _syncPushInBackground();
                     },
                   )
                       : null,
