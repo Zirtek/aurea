@@ -25,6 +25,7 @@ class StorageService {
   static const _keyCycleLength = 'aurea_cycle_length';
   static const _keyPeriodDuration = 'aurea_period_duration';
   static const _keyAutoCalc = 'aurea_auto_calc';
+  static const _keyNotifications = 'aurea_notification_settings';
 
   Future<StoredCycleData> loadData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -55,7 +56,6 @@ class StorageService {
         logs[key] = DailyLog.fromJson(value as Map<String, dynamic>);
       });
     } else {
-      // Migrazione automatica da eventuali sintomi v1 salvati in precedenza
       final rawLegacy = prefs.getString(_keyLegacySymptoms);
       if (rawLegacy != null) {
         final decoded = jsonDecode(rawLegacy) as Map<String, dynamic>;
@@ -101,6 +101,20 @@ class StorageService {
     await prefs.setInt(_keyCycleLength, cycleLength);
     await prefs.setInt(_keyPeriodDuration, periodDuration);
     await prefs.setBool(_keyAutoCalc, autoCalculate);
+  }
+
+  Future<NotificationSettings> loadNotificationSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_keyNotifications);
+    if (raw == null) return const NotificationSettings();
+    return NotificationSettings.fromJson(
+      jsonDecode(raw) as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> saveNotificationSettings(NotificationSettings settings) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyNotifications, jsonEncode(settings.toJson()));
   }
 
   String exportBackupJson(StoredCycleData data) {

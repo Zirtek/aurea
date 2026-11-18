@@ -538,3 +538,53 @@ class CycleCalculator {
     return buffer.toString().trim();
   }
 }
+
+class NotificationSettings {
+  final bool enabled;
+  final bool notifyPeriodBefore; // 2 giorni prima del ciclo
+  final bool notifyFertileStart; // Inizio finestra fertile
+  final bool notifyDailyLog;     // Promemoria serale diario/farmaci
+  final int dailyLogHour;        // Ora (0-23), default 20
+
+  const NotificationSettings({
+    this.enabled = false,
+    this.notifyPeriodBefore = true,
+    this.notifyFertileStart = true,
+    this.notifyDailyLog = true,
+    this.dailyLogHour = 20,
+  });
+
+  NotificationSettings copyWith({
+    bool? enabled,
+    bool? notifyPeriodBefore,
+    bool? notifyFertileStart,
+    bool? notifyDailyLog,
+    int? dailyLogHour,
+  }) {
+    return NotificationSettings(
+      enabled: enabled ?? this.enabled,
+      notifyPeriodBefore: notifyPeriodBefore ?? this.notifyPeriodBefore,
+      notifyFertileStart: notifyFertileStart ?? this.notifyFertileStart,
+      notifyDailyLog: notifyDailyLog ?? this.notifyDailyLog,
+      dailyLogHour: dailyLogHour ?? this.dailyLogHour,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'enabled': enabled,
+    'notifyPeriodBefore': notifyPeriodBefore,
+    'notifyFertileStart': notifyFertileStart,
+    'notifyDailyLog': notifyDailyLog,
+    'dailyLogHour': dailyLogHour,
+  };
+
+  factory NotificationSettings.fromJson(Map<String, dynamic> json) {
+    return NotificationSettings(
+      enabled: (json['enabled'] as bool?) ?? false,
+      notifyPeriodBefore: (json['notifyPeriodBefore'] as bool?) ?? true,
+      notifyFertileStart: (json['notifyFertileStart'] as bool?) ?? true,
+      notifyDailyLog: (json['notifyDailyLog'] as bool?) ?? true,
+      dailyLogHour: (json['dailyLogHour'] as int?) ?? 20,
+    );
+  }
+}
