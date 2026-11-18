@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       const msPerDay = 24 * 60 * 60 * 1000;
 
       // 1. Avviso 2 giorni prima del prossimo ciclo (inviato alle 09:00 locali)
-      if (record.notifyPeriodBefore && localHour === 9) {
+      if (record.notifyPeriodBefore) {
         const nextPeriodMs = lastStartMs + cycleLen * msPerDay;
         const daysUntil = Math.round((nextPeriodMs - localTodayMs) / msPerDay);
         if (daysUntil === 2) {
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       }
 
       // 2. Avviso inizio finestra fertile (cycleLength - 14 - 4 = cycleLength - 18, alle 09:00 locali)
-      if (record.notifyFertileStart && localHour === 9) {
+      if (record.notifyFertileStart) {
         const fertileStartMs = lastStartMs + (cycleLen - 18) * msPerDay;
         const daysUntilFertile = Math.round((fertileStartMs - localTodayMs) / msPerDay);
         if (daysUntilFertile === 0) {
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
     }
 
     // 3. Promemoria serale diario / farmaci all'ora scelta dall'utente
-    if (record.notifyDailyLog && localHour === record.dailyLogHour) {
+    if (record.notifyDailyLog) {
       const alreadyLoggedToday = record.hasLoggedToday && record.todayKey === localTodayStr;
       if (!alreadyLoggedToday) {
         messages.push({
