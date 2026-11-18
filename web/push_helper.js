@@ -1,5 +1,5 @@
 window.AureaPush = {
-  // Inserisci qui la tua VAPID Public Key generata nello Step 2
+  // Rimetti qui la tua VAPID Public Key
   vapidPublicKey: 'BFEMkPWQECSj49-T6TatKhfiJvIentH1cyGhFTs9J4cJ570cEQcRumvtyhGxLSfHW8v20mEc9dehnxTJUvPZ3aQ',
 
   getEnvironmentInfo: function () {
@@ -24,6 +24,11 @@ window.AureaPush = {
       throw new Error('PushManager non disponibile. Su iOS aggiungi prima l\'app alla schermata Home.');
     }
 
+    if (!this.vapidPublicKey || this.vapidPublicKey.includes('INSERISCI')) {
+      throw new Error('Chiave VAPID pubblica non configurata in push_helper.js.');
+    }
+
+    // Chiedi il permesso subito per non perdere il contesto del tap su iOS
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
       throw new Error('Permesso notifiche negato dall\'utente.');
@@ -32,7 +37,8 @@ window.AureaPush = {
     const registration = await navigator.serviceWorker.register('/push-sw.js', {
       scope: '/aurea-push/',
     });
-    await navigator.serviceWorker.ready;
+
+    await this._waitForActive(registration);
 
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
@@ -43,6 +49,31 @@ window.AureaPush = {
     }
 
     return JSON.stringify(subscription.toJSON());
+  },
+
+  _waitForActive: function (registration) {
+    if (registration.active) {
+      return Promise.resolve();
+    }
+    const worker = registration.installing || registration.waiting;
+    if (!worker) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error('Timeout attivazione Service Worker.'));
+      }, 10000);
+
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'activated') {
+          clearTimeout(timer);
+          resolve();
+        } else if (worker.state === 'redundant') {
+          clearTimeout(timer);
+          reject(new Error('Service Worker non attivato (redundant).'));
+        }
+      });
+    });
   },
 
   getCurrentSubscription: async function () {

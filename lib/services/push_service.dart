@@ -83,10 +83,16 @@ class PushService {
   }
 
   static Future<void> _postJson(String path, Map<String, dynamic> body) async {
-    final response = await http.post(
+    final response = await http
+        .post(
       Uri.parse(path),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
+    )
+        .timeout(
+      const Duration(seconds: 15),
+      onTimeout: () =>
+      throw Exception('Timeout connessione al server Vercel.'),
     );
     if (response.statusCode >= 400) {
       throw Exception('Errore server (${response.statusCode}): ${response.body}');
